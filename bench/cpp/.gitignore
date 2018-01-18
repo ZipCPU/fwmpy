@@ -1,0 +1,5 @@
+trace_*.vcd
+mkbnch*.mk
+mpy_tb_*
+tags
+components.h
