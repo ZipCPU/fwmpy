@@ -11,7 +11,7 @@
 //	test sgnmpy_16x20.v
 //
 // Creator:	Dan Gisselquist, Ph.D.
-//		Gisselquist Tecnology, LLC
+//		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
 //

@@ -11,7 +11,7 @@
 //	test slowmpy.v--a non-coregen IP.
 //
 // Creator:	Dan Gisselquist, Ph.D.
-//		Gisselquist Tecnology, LLC
+//		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
