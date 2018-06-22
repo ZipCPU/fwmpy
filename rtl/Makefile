@@ -48,7 +48,7 @@
 # This is really simple ...
 VDIRFB:= obj_dir
 .PHONY: all
-all: $(addprefix $(VDIRFB)/V,$(subst .v,__ALL.a,$(wildcard *.v)))
+all: $(addprefix $(VDIRFB)/V,$(subst .v,__ALL.a,$(wildcard *.v))) slowmpy
 VERILATOR := verilator
 VFLAGS := -O3 -Wall -MMD -trace -cc
 SUBMAKE := make --no-print-directory -C $(VDIRFB)
@@ -56,8 +56,19 @@ SUBMAKE := make --no-print-directory -C $(VDIRFB)
 all: $(CORES) # symfil
 
 $(VDIRFB)/Vbimpy.h: bimpy.v
-$(VDIRFB)/V%.h: %.v
+$(VDIRFB)/V%.h $(VDIRFB)/V%.mk: %.v
 	$(VERILATOR) $(VFLAGS) $<
+
+$(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
+	$(SUBMAKE) -f $^
+
+.PHONY: slowmpy
+slowmpy: $(VDIRFB)/Vslowmpy__ALL.a
+$(VDIRFB)/Vslowmpy__ALL.a: $(VDIRFB)/Vslowmpy.h $(VDIRFB)/Vslowmpy.mk
+$(VDIRFB)/Vslowmpy.h: slowmpy.v
+	
+$(VDIRFB)/Vslowmpy__ALL.a: $(VDIRFB)/Vslowmpy.h
+	$(SUBMAKE) -f Vslowmpy.mk
 
 $(VDIRFB)/Vbimpy__ALL.a: $(VDIRFB)/Vbimpy.h
 	$(SUBMAKE) -f Vbimpy.mk

@@ -47,7 +47,7 @@ VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | 
 VROOT   := $(VERILATOR_ROOT)
 VINCS	:= -I$(VROOT)/include -I$(VROOT)/include/vltstd
 INCS	:= -I$(RTLOBJD) $(VINCS)
-MPYSRCS := mpy_tb.cpp
+MPYSRCS := slowmpy_tb.cpp mpy_tb.cpp
 MPYOBJS  = $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(MICSRCS)))
 SOURCES := $(MPYSRCS)
 VLSRCS	:= verilated.cpp verilated_vcd_c.cpp
@@ -55,7 +55,7 @@ VLOBJS  := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
 VLIB	:= $(addprefix $(VROOT)/include/,$(VLSRCS))
 
 $(OBJDIR)/%.o: %.cpp
-	$(CXX) $(CFLAGS) $(INCS) -c $< -o $@
+	$(CXX) -faligned-new $(CFLAGS) $(INCS) -c $< -o $@
 
 components.h: $(wildcard $(RTLOBJD)/V*.h)
 	echo "#ifndef COMPONENTS_H" > components.h
@@ -70,6 +70,11 @@ components.h: $(wildcard $(RTLOBJD)/V*.h)
 	
 $(OBJDIR)/%.o: $(VROOT)/include/%.cpp
 	$(CXX) $(CFLAGS) $(INCS) -c $< -o $@
+
+$(OBJDIR)/slowmpy_tb.o: slowmpy_tb.cpp $(RTLOBJD)/Vslowmpy.h
+	$(CXX) -faligned-new $(CFLAGS) $(INCS) -c slowmpy_tb.cpp -o $@
+slowmpy_tb: $(OBJDIR)/slowmpy_tb.o $(VLOBJS) $(RTLOBJD)/Vslowmpy__ALL.a
+	$(CXX) $(CFLAGS) $(INCS) $^ -o $@
 
 .PHONY: test
 test:
@@ -91,7 +96,7 @@ depends: tags $(OBJDIR)/
 $(OBJDIR)/:
 	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR)/; fi"
 
-$(OBJDIR)/depends.txt: $(OBJDIR)/ depends
+$(OBJDIR)/depends.txt: components.h depends
 
 .PHONY: clean
 clean:

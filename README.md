@@ -17,6 +17,11 @@ rather build a test-bench for a different multiply.)  Beware, the test
 bench is exhaustive: you may not wish to run it on a 32x32 multiply, as it
 might take years.
 
+The repository also contains a third core, [slowmpy](rtl/slowmpy.v).  This one
+isn't built by the coregen process above.  Instead, it contains a multiplication
+implementation that is designed to be low logic, and hence trades logic for
+speed.  It will take about N+2 clocks to multiply an N-bit number.
+
 # License
 
 This software, and the cores it generates, are licensed under the
