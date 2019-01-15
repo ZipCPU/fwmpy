@@ -18,7 +18,7 @@
 ##
 ################################################################################
 ##
-## Copyright (C) 2015-2018, Gisselquist Technology, LLC
+## Copyright (C) 2015-2019, Gisselquist Technology, LLC
 ##
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
@@ -42,7 +42,7 @@
 ##
 ##
 all:	gpl
-pdf:	gpl spec
+pdf:	gpl # spec
 DSRC := src
 
 .PHONY: gpl
@@ -76,4 +76,3 @@ clean:
 	rm -f $(DSRC)/spec.lot $(DSRC)/spec.lof
 	rm -f $(DSRC)/spec.out spec.ps spec.pdf
 	rm -f gpl-3.0.pdf
-

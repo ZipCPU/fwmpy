@@ -42,7 +42,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2018, Gisselquist Technology, LLC
+// Copyright (C) 2015-2019, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -68,7 +68,7 @@
 const char	cpyleft[] = 
 "////////////////////////////////////////////////////////////////////////////////\n"
 "//\n"
-"// Copyright (C) 2015,2017-2018, Gisselquist Technology, LLC\n"
+"// Copyright (C) 2015,2017-2019, Gisselquist Technology, LLC\n"
 "//\n"
 "// This program is free software (firmware): you can redistribute it and/or\n"
 "// modify it under the terms of  the GNU General Public License as published\n"
