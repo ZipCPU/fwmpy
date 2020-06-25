@@ -55,7 +55,7 @@ VLOBJS  := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
 VLIB	:= $(addprefix $(VROOT)/include/,$(VLSRCS))
 
 $(OBJDIR)/%.o: %.cpp
-	$(CXX) -faligned-new $(CFLAGS) $(INCS) -c $< -o $@
+	$(CXX) $(CFLAGS) $(INCS) -c $< -o $@
 
 components.h: $(wildcard $(RTLOBJD)/V*.h)
 	echo "#ifndef COMPONENTS_H" > components.h
@@ -72,7 +72,7 @@ $(OBJDIR)/%.o: $(VROOT)/include/%.cpp
 	$(CXX) $(CFLAGS) $(INCS) -c $< -o $@
 
 $(OBJDIR)/slowmpy_tb.o: slowmpy_tb.cpp $(RTLOBJD)/Vslowmpy.h
-	$(CXX) -faligned-new $(CFLAGS) $(INCS) -c slowmpy_tb.cpp -o $@
+	$(CXX) $(CFLAGS) $(INCS) -c slowmpy_tb.cpp -o $@
 slowmpy_tb: $(OBJDIR)/slowmpy_tb.o $(VLOBJS) $(RTLOBJD)/Vslowmpy__ALL.a
 	$(CXX) $(CFLAGS) $(INCS) $^ -o $@
 

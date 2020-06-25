@@ -42,7 +42,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2019, Gisselquist Technology, LLC
+// Copyright (C) 2015-2020, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -68,7 +68,7 @@
 const char	cpyleft[] = 
 "////////////////////////////////////////////////////////////////////////////////\n"
 "//\n"
-"// Copyright (C) 2015,2017-2019, Gisselquist Technology, LLC\n"
+"// Copyright (C) 2015-2020, Gisselquist Technology, LLC\n"
 "//\n"
 "// This program is free software (firmware): you can redistribute it and/or\n"
 "// modify it under the terms of  the GNU General Public License as published\n"
@@ -93,6 +93,7 @@ const char	cpyleft[] =
 #include <stdlib.h>
 #include <string>
 #include <string.h>
+#include <unistd.h>
 #include <assert.h>
 
 const char	prjname[] = "A multiply core generator";
@@ -153,13 +154,14 @@ void	buildbimpy(FILE *fp, char *name, bool async_reset) {
 "module	bimpy(i_clk, %s, i_ce, i_a, i_b, o_r);\n",
 		(async_reset)?"i_areset_n":"i_reset");
 	fprintf(fp,
-	"\tparameter\tBW=18, LUTB=2;\n"
-	"\tinput\t\t\t\ti_clk, %s, i_ce;\n",
+	"\tparameter\tBW=18; // Number of bits in i_b\n"
+	"\tlocalparam\tLUTB=2;// Number of bits in i_a for our LUT multiply\n"
+	"\tinput\twire\t\t\ti_clk, %s, i_ce;\n",
 		(async_reset)?"i_areset_n":"i_reset");
 		
 	fprintf(fp,
-	"\tinput\t\t[(LUTB-1):0]\ti_a;\n"
-	"\tinput\t\t[(BW-1):0]\ti_b;\n"
+	"\tinput\twire\t[(LUTB-1):0]\ti_a;\n"
+	"\tinput\twire\t[(BW-1):0]\ti_b;\n"
 	"\toutput\treg\t[(BW+LUTB-1):0]\to_r;\n"
 "\n"
 	"\twire\t[(BW+LUTB-2):0]\tw_r;\n"
@@ -175,17 +177,41 @@ void	buildbimpy(FILE *fp, char *name, bool async_reset) {
 	if (async_reset)
 		fprintf(fp,
 		"\talways @(posedge i_clk, negedge i_areset_n)\n"
-			"\t\tif (!i_areset_n)\n");
+		"\tif (!i_areset_n)\n");
 	else
 		fprintf(fp,
 			"\talways @(posedge i_clk)\n"
-				"\t\tif (i_reset)\n");
+			"\tif (i_reset)\n");
 
 	fprintf(fp,
-		"\t\t\to_r <= 0;\n"
-		"\t\telse if (i_ce)\n"
-			"\t\t\to_r <= w_r + { c, 2'b0 };\n"
+		"\t\to_r <= 0;\n"
+		"\telse if (i_ce)\n"
+		"\t\to_r <= w_r + { c, 2'b0 };\n");
+
+	fprintf(fp, "\n"
+"`ifdef	FORMAL\n"
+"\treg	f_past_valid;\n"
 "\n"
+"\tinitial	f_past_valid = 1'b0;\n"
+"\talways @(posedge i_clk)\n"
+"\tf_past_valid <= 1'b1;\n"
+"\n"
+"`define	ASSERT	assert\n"
+"\n"
+"\talways @(posedge i_clk)\n"
+"\tif ((f_past_valid)&&($past(i_ce)))\n"
+"\tbegin\n"
+"\t\tif ($past(i_a)==0)\n"
+"\t\t\t`ASSERT(o_r == 0);\n"
+"\t\telse if ($past(i_a) == 1)\n"
+"\t\t\t`ASSERT(o_r == $past(i_b));\n"
+"\n"
+"\t\tif ($past(i_b)==0)\n"
+"\t\t\t`ASSERT(o_r == 0);\n"
+"\t\telse if ($past(i_b) == 1)\n"
+"\t\t\t`ASSERT(o_r[(LUTB-1):0] == $past(i_a));\n"
+"\tend\n"
+"`endif\n"
 "endmodule\n");
 }
 
@@ -863,23 +889,43 @@ void	buildmpy(const char *dir, int premul, int Na, int Nb, bool use_aux, bool as
 }
 
 void	usage(void) {
-	printf("USAGE: bldmpy <#-of-bits-in-A> <#-of-bits-in-B>\n");
+	printf("USAGE: bldmpy [-d dir] [-n name] <#-of-bits-in-A> <#-of-bits-in-B>\n");
 }
 
 int main(int argc, char **argv) {
 	bool	use_aux = true;
 	bool	async_reset = false;
 	int	premul = 2;
-	const char	core_dir[] = "../rtl";
+	const char	*core_dir = "../rtl";
+			// *core_name = NULL;
+	int	na, nb;
 
-	if (argc != 3) {
+	{ int c;
+        while((c = getopt(argc, argv, "d:n:aA")) != -1) {
+                switch(c) {
+                case 'a':	use_aux = true;      break;
+                case 'A':	use_aux = false;     break;
+                case 'r':	async_reset = true;  break;
+                case 'R':	async_reset = false; break;
+                case 'd':	core_dir  = strdup(optarg); break;
+                case 'n':	break; // core_name = strdup(optarg); break;
+		default:
+			break;
+		}
+	}}
+
+	if (argc -optind != 2) {
 		usage();
 		exit(EXIT_FAILURE);
 	}
 	if (premul != 2) {
 		fprintf(stderr, "WARNING: The bimpy pre-multiply is the only one that has been proven\n");
 	}
-	buildmpy(core_dir, premul, atoi(argv[1]), atoi(argv[2]), use_aux, async_reset);
+
+	na = atoi(argv[optind]);
+	nb = atoi(argv[optind+1]);
+
+	buildmpy(core_dir, premul, na, nb, use_aux, async_reset);
 
 	return(0);
 }

@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2018-2019, Gisselquist Technology, LLC
+// Copyright (C) 2018-2020, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -43,24 +43,46 @@
 `default_nettype	none
 //
 //
-module	slowmpy(i_clk, i_reset, i_stb, i_a, i_b, i_aux, o_busy,
+module	slowmpy(i_clk, i_reset, i_stb, i_a_unsorted, i_b_unsorted, i_aux, o_busy,
 		o_done, o_p, o_aux);
-	parameter			LGNA = 6;
-	parameter	[LGNA:0]	NA = 32;
-	parameter	[0:0]		OPT_SIGNED = 1'b0;
-	localparam	NB = NA;	// Must be = NA for OPT_SIGNED to work
+	parameter				LGN = 4;
+	parameter	[LGNA:0]	IA = 12, // Number of bits in A
+						IB = 11;
+	parameter	[0:0]			OPT_SIGNED = 1'b1;
+	// IB is the number of bits in B.  It must be == IA for the OPT_SIGNED
+	// option to work properly
 	//
-	input	wire	i_clk, i_reset;
+	input	wire				i_clk, i_reset;
 	//
-	input	wire	i_stb;
-	input	wire	signed	[(NA-1):0]	i_a;
-	input	wire	signed	[(NB-1):0]	i_b;
+	input	wire				i_stb;
+	input	wire	signed	[(IA-1):0]	i_a_unsorted;
+	input	wire	signed	[(IB-1):0]	i_b_unsorted;
 	input	wire				i_aux;
 	output	wire				o_busy, o_done;
 	output	reg	signed	[(NA+NB-1):0]	o_p;
 	output	reg				o_aux;
 
-	reg	[LGNA-1:0]	count;
+	localparam	NA = (IA > IB) ? IA : IB;	// NA is bigger
+	localparam	NB = (IA > IB) ? IB : IA;
+	// localparam	NB = NA;// Must be = NA for OPT_SIGNED to work
+
+	wire	[NA-1:0]	i_a;
+	wire	[NB-1:0]	i_b;
+
+	generate if (IA > IB)
+	begin
+
+		assign	i_a = i_b_unsorted;
+		assign	i_b = i_a_unsorted;
+
+	end else begin
+
+		assign	i_a = i_a_unsorted;
+		assign	i_b = i_b_unsorted;
+
+	end endgenerate
+
+	reg	[LGN-1:0]	count;
 	reg	[NA-1:0]	p_a;
 	reg	[NB-1:0]	p_b;
 	reg	[NA+NB-1:0]	partial;
@@ -101,15 +123,15 @@ module	slowmpy(i_clk, i_reset, i_stb, i_a, i_b, i_aux, o_busy,
 	always @(posedge i_clk)
 	if (!o_busy)
 	begin
-		count <= NA[LGNA-1:0]-1;
+		count <= NB[LGN-1:0]-1;
 		partial <= 0;
 		p_a <= i_a;
 		p_b <= i_b;
 	end else begin
 		p_b <= (p_b >> 1);
-		// partial[NA+NB-1:NB] <= partial[NA+NB
+
 		partial[NB-2:0] <= partial[NB-1:1];
-		if ((OPT_SIGNED)&&(pre_done))
+		if ((OPT_SIGNED)&&(NA == NB)&&(pre_done))
 			partial[NA+NB-1:NB-1] <= { 1'b0, partial[NA+NB-1:NB]} +
 				{ 1'b0, pwire[NA-1], ~pwire[NA-2:0] };
 		else if (OPT_SIGNED)
@@ -121,14 +143,20 @@ module	slowmpy(i_clk, i_reset, i_stb, i_a, i_b, i_aux, o_busy,
 		count <= count - 1;
 	end
 
+	wire	[NA+NB-1:0]	final_bit_fix;
+	assign	final_bit_fix = (NA == NB)
+			? {1'b1,{(NA-2){1'b0}},1'b1, {(NB){1'b0}}}
+			: ({1'b1,{(NB-1){1'b0}}, 1'b1, {(NA-1){1'b0}}}
+	+0);//		+ ((NA == NB+1) ? 0
+	//		: {2'b00,{(NA-NB-1){1'b1}}, {(2*NB-3){1'b0}}}));
+
 	always @(posedge i_clk)
 	if (almost_done)
 	begin
 		if (OPT_SIGNED)
-			o_p   <= partial[NA+NB-1:0]
-				+ {1'b1,{(NA-2){1'b0}},1'b1, {(NB){1'b0}}};
+			o_p   <= partial + final_bit_fix;
 		else
-			o_p   <= partial[NA+NB-1:0];
+			o_p   <= partial;
 		o_aux <= aux;
 	end
 
@@ -176,7 +204,7 @@ module	slowmpy(i_clk, i_reset, i_stb, i_a, i_b, i_aux, o_busy,
 		`ASSERT(almost_done == (o_busy&&(&count)));
 
 	always @(*)
-		if (!(&count[LGNA-1:1])||(count[0]))
+		if (!(&count[LGN-1:1])||(count[0]))
 			`ASSERT(!o_done);
 
 	always @(posedge i_clk)
@@ -186,7 +214,8 @@ module	slowmpy(i_clk, i_reset, i_stb, i_a, i_b, i_aux, o_busy,
 	if (!o_busy)
 		`ASSERT(!almost_done);
 
-	reg	[NA-1:0]	f_a, f_b;
+	reg	signed [NA-1:0]	f_a;
+	reg	signed [NB-1:0]	f_b;
 	always @(posedge i_clk)
 	if ((i_stb)&&(!o_busy))
 	begin
@@ -194,13 +223,43 @@ module	slowmpy(i_clk, i_reset, i_stb, i_a, i_b, i_aux, o_busy,
 		f_b <= i_b;
 	end
 
+	wire	[NA-1:0]	f_a_neg;
+	wire	[NB-1:0]	f_b_neg;
+
+	assign	f_a_neg = -f_a;
+	assign	f_b_neg = -f_b;
+
 	always @(*)
 	if (o_done)
 	begin
 		if ((f_a == 0)||(f_b == 0))
 			`ASSERT(o_p == 0);
-		else
-			`ASSERT(o_p[NA+NB-1] == f_a[NA-1] ^ f_b[NA-1]);
+		else if ((f_a == {1'b1,{(NA-1){1'b0}}})
+			||(f_b == {1'b1,{(NB-1){1'b0}}}))
+			;
+		else if (f_a == 1)
+		begin
+			`ASSERT(o_p[NB-1:0] == f_b);
+			if (OPT_SIGNED)
+				`ASSERT(o_p[NA+NB-1:NA] == {(NA){f_b[NB-1]}});
+		end else if (f_b == 1)
+		begin
+			`ASSERT(o_p[NA-1:0] == f_a);
+			if (OPT_SIGNED)
+				`ASSERT(o_p[NA+NB-1:NB] == {(NB){f_a[NA-1]}});
+		end else if ((OPT_SIGNED)&&(&f_a))
+		begin
+			`ASSERT(o_p[NB-1:0] == f_b_neg);
+			`ASSERT(o_p[NA+NB-1:NA] == {(NA){f_b_neg[NB-1]}});
+		end else if ((OPT_SIGNED)&&(&f_b))
+		begin
+			`ASSERT(o_p[NA-1:0] == f_a_neg);
+			`ASSERT(o_p[NA+NB-1:NB] == {(NB){f_a_neg[NA-1]}});
+		end else begin
+			`ASSERT((!OPT_SIGNED)
+				||(o_p[NA+NB-1] == (f_a[NA-1] ^ f_b[NB-1])));
+			`ASSERT(o_p[NA+NB-1:0] != 0);
+		end
 	end
 
 	always @(posedge i_clk)
